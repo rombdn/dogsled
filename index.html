@@ -1,0 +1,1949 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>&#10035;&#9734;DOGGY SLEDDING&#8482;&#9734;&#10035;</title>
+		<meta name="description" content="Ramene les chiens dans leur niche!">
+		<meta name="keywords" content="html5, box2d, javascript, box2djs, game, jeux, chien, dog, luge, sled">
+		<meta property="og:title" content="&#10035;&#9734;DOGGY SLEDDING&#8482;&#9734;&#10035;">
+		<meta property="og:image" content="http://www.wajrak.com/images/snowboard_dog.jpg">
+		<meta property="og:type" content="game">
+		<meta property="og:url" content="http://www.wajrak.com">
+		<meta property="og:description" content="Ramene les chiens dans leur niche!">
+		<meta name="robots" content="index, follow">
+		<link rel="stylesheet" type="text/css" href="dogrider.css">
+	</head>
+	<body>
+		<div width="500" height="500" id="loading">Loading...<img src="sprites/ajax-loader.gif" /></div>
+		<span id="alert"></span>
+		<canvas id="canvas" width="500" height="500">
+			Navigateur non support&eacute;<br />
+			<a href="http://www.google.com/intl/fr/chrome/browser/">Google Chrome</a><br />
+			<a href="http://www.apple.com/fr/downloads/">Safari (mac)</a><br />
+		</canvas>
+		<script type="text/javascript" src="js/Box2dWeb-2.1.a.3.min.js"></script>
+		<script type="text/javascript" src="js/PxLoader.js"></script>
+		<script type="text/javascript" src="js/PxLoaderImage.js"></script>
+		<!--<script type="text/javascript" src="Stats.js"></script>-->
+		<script type="text/javascript">
+			function msg_alert() {
+				msg = document.getElementById('alert')
+				msg.style.display = 'block';
+				msg.innerHTML = 'Navigateur non support&eacute;<br /> \
+					<a href="http://www.google.com/intl/fr/chrome/browser/">Google Chrome</a><br /> \
+					<a href="http://www.apple.com/fr/downloads/">Safari (mac)</a>';
+			}
+			function msg_alert_mobile() {
+				msg = document.getElementById('alert')
+				msg.style.display = 'block';
+				msg.innerHTML = 'Mobiles non support&eacute;s';
+			}
+			
+			/*
+			var stats = new Stats();
+			stats.setMode(0); // 0: fps, 1: ms
+
+			// Align top-left
+			stats.domElement.style.position = 'absolute';
+			stats.domElement.style.left = '500px';
+			stats.domElement.style.top = '0px';
+
+			document.body.appendChild( stats.domElement );
+			*/
+			var nb_os_init = 5;
+			
+			var world;
+			var canvas;
+			var SCALE = 25;
+			var groupindexglobal = -111;
+			var started = false;
+			var score = 0;
+			var lastloop = new Date();
+	
+			var maison_ecroule = false;
+			
+			var cat_dog = 0x0100;
+			var cat_decor = 0x0002;
+			var cat_luge = 0x0004;
+			var cat_bckg = 0x0008;
+			var cat_line = 0x0010;
+			
+			var dessin = false; //si la souris est appuye
+			var ligne = false;
+			
+			var dogs = [];
+			var luges = [];
+			var lines = [];
+			var images = [];
+			
+			var nb_os = nb_os_init;
+			
+			var DOG_X, DOG_Y;
+			
+			var bonus = 0;
+			var zoom = 0;
+			
+			var loader = new PxLoader();
+			
+			//var lastloop = new Date;
+			
+			var sjump, sup, sgo, spoc, swrong, ssnow, sdog1, sdog2, sback;
+			var texts = [];
+			
+			var last_text = new Date();
+			
+			
+			
+			(function() {
+				var lastTime = 0;
+				var vendors = ['ms', 'moz', 'webkit', 'o'];
+				for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+					window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+					window.cancelAnimationFrame = 
+					  window[vendors[x]+'CancelAnimationFrame'] || window[vendors[x]+'CancelRequestAnimationFrame'];
+				}
+			 
+				if (!window.requestAnimationFrame)
+					window.requestAnimationFrame = function(callback, element) {
+						var currTime = new Date().getTime();
+						var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+						var id = window.setTimeout(function() { callback(currTime + timeToCall); }, 
+						  timeToCall);
+						lastTime = currTime + timeToCall;
+						return id;
+					};
+			 
+				if (!window.cancelAnimationFrame)
+					window.cancelAnimationFrame = function(id) {
+						clearTimeout(id);
+					};
+			}());			
+			
+			
+			
+			
+			function Text(msg, x, y)
+			{
+				this.debut = new Date();
+				this.msg = msg;
+				this.x = x;
+				this.y = y;
+				this.alpha = 1.0;
+				
+				texts.push(this);
+			}
+			
+			
+			function dog_initsound()
+			{
+				
+				sjump = new Audio('sounds/smw_jump.wav');
+				sup = new Audio('sounds/smw_1-up.wav');
+				swrong = new Audio('sounds/smw_incorrect.wav');
+				spoc = new Audio('sounds/smw_shell_ricochet.wav');
+				sgo = new Audio('sounds/tongue.wav');
+				sdog1 = new Audio('sounds/dog3.mp3');
+				sdog2 = new Audio('sounds/dog6.mp3');
+				sback = new Audio('sounds/tje_theme.mp3');
+				shappy = new Audio('sounds/small_dog.mp3');
+				sback.loop = "loop";
+				sexplode = new Audio('sounds/explosion.mp3');
+				skid = new Audio('sounds/skid.wav');
+				skid.volume = 0.1;
+				sexplode.volume = 0.6;
+				sback.volume = 0.2;
+				sdog1.volume = 0.7;
+				shappy.volume = 0.6;
+				
+				sback.play();
+			}
+			
+			function dog_loadimages()
+			{
+				var images = ["sprites/snowman_bas.png", "sprites/snowman_milieu.png", "sprites/snowman_tete.png", 
+					"sprites/dog4.png", "sprites/dog_labrador.png", "sprites/luge.png", "sprites/rondin.png",
+					"sprites/neige.png", "sprites/greg.png", "sprites/karo.png", "sprites/niche.png", "sprites/rondin2.png", 
+					"sprites/max.png", "sprites/fond.jpg", "sprites/rondin2.png"];
+				
+				var img = new Image();
+				
+				for(elem in images) {
+					img = loader.addImage(images[elem]);
+				}
+			}
+			
+			function loadimage(path)
+			{
+				var img = new Image();
+				img.src = path;
+				return img
+			}
+			
+			function Dog(dog, luge, patin1, patin2, patin3)
+			{
+				this.mluge = luge;
+				this.mdog = dog;
+				this.mpatin1 = patin1;
+				this.mpatin2 = patin2;
+				this.mpatin3 = patin3;
+				this.elements = [this.mdog, this.mluge, this.mpatin1, this.mpatin2, this.mpatin3];
+				this.os = 0;
+				this.last_os = 0;
+				
+				this.x_init = this.mluge.GetPosition().x;
+				this.y_init = this.mluge.GetPosition().y;
+			}
+			
+			var b2Vec2 = Box2D.Common.Math.b2Vec2,
+				b2BodyDef = Box2D.Dynamics.b2BodyDef,
+				b2Body = Box2D.Dynamics.b2Body,
+				b2FixtureDef = Box2D.Dynamics.b2FixtureDef,
+				b2Fixture = Box2D.Dynamics.b2Fixture,
+				b2World = Box2D.Dynamics.b2World,
+				b2MassData = Box2D.Collision.Shapes.b2MassData,
+				b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape,
+				b2CircleShape = Box2D.Collision.Shapes.b2CircleShape,
+				b2DebugDraw = Box2D.Dynamics.b2DebugDraw,
+				b2EdgeShape = Box2D.Collision.Shapes.b2EdgeShape,
+				b2RevoluteJointDef = Box2D.Dynamics.Joints.b2RevoluteJointDef,
+				b2PrismaticJointDef = Box2D.Dynamics.Joints.b2PrismaticJointDef,
+				b2DistanceJointDef = Box2D.Dynamics.Joints.b2DistanceJointDef;
+			
+			
+			window.onload = function()
+			{				
+				if(navigator.userAgent.toLowerCase().indexOf("chrome") == -1
+					&& navigator.userAgent.toLowerCase().indexOf("safari") == -1)
+				{
+					document.getElementById('loading').style.display = 'none';
+					msg_alert();
+					return;
+				}
+				
+				if( navigator.userAgent.match(/Android/i)
+					|| navigator.userAgent.match(/webOS/i)
+					|| navigator.userAgent.match(/iPhone/i)
+					|| navigator.userAgent.match(/iPad/i)
+					|| navigator.userAgent.match(/iPod/i)
+					|| navigator.userAgent.match(/BlackBerry/i)
+					|| navigator.userAgent.match(/Windows Phone/i))
+				{
+					msg_alert_mobile();
+					return;
+				}
+				
+				document.getElementById('canvas').style.display = 'none';
+				document.getElementById('loading').style.display = 'block';
+
+				
+				dog_loadimages();
+				loader.start();
+				loader.addCompletionListener(function() {
+					dog_initcanvas();
+					dog_initsound();
+					dog_events();
+					dog_initworld();
+					dog_setupcollisions();
+					dog_initdraw();
+					dog_update();
+					//window.setInterval(dog_update, 1000 / 60);
+				});
+
+				document.getElementById('canvas').style.display = 'block';
+				document.getElementById('loading').style.display = 'none';
+			}
+			
+			function dog_restart()
+			{
+				SCALE = SCALE_INIT;
+				dog_initworld();
+				dog_setupcollisions();
+				dog_initdraw();
+				dogs = [];
+				score = 0;
+				nb_os = nb_os_init;
+				maison_ecroule = false;	
+			}
+			
+			function dog_action(action)
+			{
+				var power = 35;
+				/*
+				for(body = world.GetBodyList(); body; body = body.GetNext()) {
+					if(body.GetUserData() != "luge")
+						continue;
+					
+					if(action == "jump") {
+						body.ApplyImpulse(new b2Vec2(Math.cos(3*Math.PI/2) * power, Math.sin(3*Math.PI/2) * power),
+							body.GetWorldCenter());
+					}
+					
+					if(action == "acc") {
+						if(body.GetLinearVelocity().x >= 0) {
+							body.ApplyImpulse(new b2Vec2(Math.cos(0) * power/2, Math.sin(0) * power/2),
+								body.GetWorldCenter());
+						}
+						else {
+							body.ApplyImpulse(new b2Vec2(Math.cos(Math.PI) * power/2, Math.sin(Math.PI) * power/2),
+								body.GetWorldCenter());
+						}
+					}
+				}
+				*/
+				for(dog in dogs) {
+					//actions au contact seulement
+
+					/*console.log(dogs[dog].mpatin1.GetUserData().indexOf("touch") + " " + dogs[dog].mpatin2.GetUserData().indexOf("touch")
+						+ " " + dogs[dog].mpatin3.GetUserData().indexOf("touch"));*/
+					
+					if(dogs[dog].mpatin1.GetUserData().indexOf("touch") == -1 &&
+						dogs[dog].mpatin2.GetUserData().indexOf("touch") == -1 &&
+						dogs[dog].mpatin3.GetUserData().indexOf("touch") == -1)
+						continue;
+					
+					if(action == "jump") {
+						sjump.play();
+						dogs[dog].mluge.ApplyImpulse(new b2Vec2(Math.cos(3*Math.PI/2) * power, Math.sin(3*Math.PI/2) * power),
+							dogs[dog].mluge.GetWorldCenter());
+					}
+					
+					if(action == "acc") {
+						if(dogs[dog].mluge.GetLinearVelocity().x >= 0) {
+							dogs[dog].mluge.ApplyImpulse(new b2Vec2(Math.cos(0) * power/2, Math.sin(0) * power/2),
+								dogs[dog].mluge.GetWorldCenter());
+						}
+						else {
+							dogs[dog].mluge.ApplyImpulse(new b2Vec2(Math.cos(Math.PI) * power/2, Math.sin(Math.PI) * power/2),
+								dogs[dog].mluge.GetWorldCenter());
+						}
+					}
+				}
+			}
+			
+			function dog_setupcollisions()
+			{	
+				var listener = new Box2D.Dynamics.b2ContactListener;
+				
+				listener.BeginContact = function(contact) {
+				
+					if(contact.GetFixtureA().IsSensor() && contact.GetFixtureB().GetBody().GetUserData() == "line") {
+						contact.GetFixtureA().GetBody().SetUserData("patin|touch");
+						//console.log("touch");
+						//ssnow.play();
+					}
+						
+					if(contact.GetFixtureB().IsSensor() && contact.GetFixtureA().GetBody().GetUserData() == "line") {
+						contact.GetFixtureB().GetBody().SetUserData("patin|touch");
+						//console.log("touch");
+						//ssnow.play();
+					}
+				}
+				
+				listener.EndContact = function(contact) {
+					if(contact.GetFixtureA().IsSensor()) {
+						contact.GetFixtureA().GetBody().SetUserData("patin");
+						//ssnow.pause();
+					}
+						
+					if(contact.GetFixtureB().IsSensor()) {
+						contact.GetFixtureB().GetBody().SetUserData("patin");
+						//ssnow.pause();
+					}
+					
+					
+				}
+				
+				listener.PreSolve = function(contact) {
+					var dataA = contact.GetFixtureA().GetBody().GetUserData();
+					var dataB = contact.GetFixtureB().GetBody().GetUserData();
+					
+					if(dataA == "line" && (dataB == "toit" || dataB == "mur" || dataB == "niche"))
+					{
+						contact.SetEnabled(false);
+						//contact.GetFixtureB().GetBody().SetUserData("dead");
+					}
+					
+					else if( (dataA.indexOf("dog") != -1 || dataA == "luge") && dataB == "os") {
+						//contact.GetFixtureB().GetBody().SetUserData("os|mange|);
+						dog_attacheos(contact.GetFixtureA().GetBody(), contact.GetFixtureB().GetBody());
+					}
+					
+					else if( (dataB.indexOf("dog") != -1 || dataB == "luge") && dataA == "os") {
+						//contact.GetFixtureA().GetBody().SetUserData("os|mange|");
+						dog_attacheos(contact.GetFixtureA().GetBody(), contact.GetFixtureA().GetBody());
+					}
+				}
+				
+				listener.PostSolve = function(contact, impulse) {
+					var dataA = contact.GetFixtureA().GetBody().GetUserData();
+					var dataB = contact.GetFixtureB().GetBody().GetUserData();
+
+					if(dataA == "niche" && (dataB == "luge" || dataB.indexOf("dog") != -1 ||dataB.indexOf("patin") != -1))
+					{
+						/*console.log("chien dans niche, " + impulse.normalImpulses[0]
+							+ " " + impulse.normalImpulses[1] + " " + impulse.tangentImpulses[0]
+							+ " " + impulse.tangentImpulses[1]);*/
+						contact.GetFixtureB().GetBody().SetUserData("dead");
+					}
+					else if(dataB == "niche" && (dataA == "luge" || dataA.indexOf("dog") != -1 || dataA.indexOf("patin") != -1))
+					{
+						//console.log("chien dans niche" + impulse.normalImpulses[0] + " " + impulse.normalImpulses[1]);
+						contact.GetFixtureA().GetBody().SetUserData("dead");
+					}
+					else if(impulse.normalImpulses[0] > 3 && (dataA == "mur" || dataB == "mur" || dataA == "toit" || dataB == "toit")) {
+						sexplode.play();
+						if(!maison_ecroule) {
+							new Text("-10", contact.GetFixtureA().GetBody().GetPosition().x-1, contact.GetFixtureA().GetBody().GetPosition().y);
+							score-=10;
+							maison_ecroule = true;
+						}
+					}
+					else if((dataA == "karo" && (dataB == "luge" || dataB.indexOf("dog") != -1)) || (dataB == "karo" && (dataA == "luge" || dataA.indexOf("dog") != -1))) {
+						shappy.play();
+					}
+					else if(impulse.normalImpulses[0] > 10 && (dataA.indexOf("dog") != -1 || dataB.indexOf("dog") != -1)) {
+						//skid.play();
+						//sdog1.play();
+						skid.play();
+						//spoc.play();
+					}
+					else if(impulse.normalImpulses[0] > 10) {
+						spoc.play();
+					}
+				}
+				
+				world.SetContactListener(listener);
+			}
+			
+			function dog_attacheos(body, os) {
+				for(dog in dogs) {
+					for(elem in dogs[dog].elements) {
+						if(dogs[dog].elements[elem] == body) {
+							dogs[dog].os += 1;
+							os.SetUserData("os|mange|" + dog);						
+							shappy.play();
+							break;
+							
+						}
+					}
+				}
+			}
+			
+			function dog_niche()
+			{
+				//on check si une partie d'un chien (luge, chien, patin...) est dead
+				//si oui on supprime l'ensemble des parties
+				
+				var dead = 0;
+				
+				for(dog in dogs) {
+					//console.log(dogs[dog].os);
+					for(elem in dogs[dog].elements) {
+						if(dogs[dog].elements[elem].GetUserData() == "dead") {
+							dead = 1;
+						}
+					}
+					
+					//si une des parties est supprimee
+					if(dead == 1) {
+						for(elem in dogs[dog].elements)
+							world.DestroyBody(dogs[dog].elements[elem]);
+						
+						score += dogs[dog].os*3;
+						score+=10;
+						new Text("+"+(dogs[dog].os*3+10), dogs[dog].mluge.GetPosition().x, dogs[dog].mluge.GetPosition().y);
+						//console.log("+"+(dogs[dog].os*3+10));
+						dogs.splice(dog,1);
+						sup.play();
+						sdog2.play();
+					}
+					/*coordonnees pour le zoom
+					else {
+						DOG_X = dogs[dog].mluge.GetPosition().x;
+						DOG_Y = dogs[dog].mluge.GetPosition().y;
+					}
+					*/
+					
+					dead = 0;
+				}
+			}
+			
+			
+			function dog_events()
+			{
+				canvas.addEventListener('mousedown', function(e) {
+					dessin = true;
+					
+					if(!started)
+						started = true;
+					
+				});
+				canvas.addEventListener('mouseup', function(e) {
+					dessin = false;
+					ligne = false;
+				});
+				
+				canvas.addEventListener('mousemove', function(e) {
+					var rect = canvas.getBoundingClientRect();
+
+					if(e.pageX - rect.left > canvas.width / 2 + 5*SCALE/*- 17*SCALE*/) {
+						dessin = false;
+						ligne = false;						
+					}
+					
+					if(dessin == true)
+					{
+						dog_dessiner(e.pageX - rect.left, e.pageY - rect.top);
+					}
+				});
+				
+				window.addEventListener('mousemove', function(e) {
+					var rect = canvas.getBoundingClientRect();
+					
+					if(e.pageX > rect.left + canvas.width ||
+						e.pageX < rect.left ||
+						e.pageY > rect.top + canvas.height ||
+						e.pageY < rect.top)
+					{
+						dessin = false;
+						ligne = false;
+					}
+				});
+				
+				window.addEventListener('resize', function(e) {
+					dog_restart();
+					dog_initcanvas();
+				});
+				
+				window.addEventListener('keydown', function(e) {
+					if(e.keyCode == 82) {
+						dog_restart();
+					}
+					
+					else if(e.keyCode == 69) {
+						dog_eraseline();
+					}
+					
+					else if(e.keyCode == 39) {
+						if(bonus == 1) {
+							dog_action("acc");
+							bonus = 0;
+						}
+					}
+					
+					else if(e.keyCode == 38)
+						dog_action("jump");
+						
+					else if(e.keyCode == 32) {
+						if(zoom == 1 && dogs.length > 0)
+							zoom = 0;
+							
+						else if(dogs.length < 2) {
+							dog_createdog();
+							zoom = 1;
+						}
+						else {
+							if(Math.random() * 10 > 3) {
+								dog_createdog();
+								zoom = 1;
+							}
+							else
+								dog_createjunk();
+						}
+					}
+					else if(e.keyCode == 187) {
+						zoom = 1;
+					}
+					else if(e.keyCode == 189) {
+						zoom = 0;
+					}
+					else if(e.keyCode == 77) {
+						if(sback.paused)
+							sback.play();
+						else
+							sback.pause();
+					}
+				});
+
+			}
+			
+			function dog_eraseline()
+			{
+				for(body = world.GetBodyList(); body; body = body.GetNext()) {
+					if(body.GetUserData() == "line") {
+						world.DestroyBody(body);
+					}
+				}		
+			}
+			
+			function dog_dessiner(x, y)
+			{	
+				if(ligne)
+				{
+					ligne.width = x - ligne.x;
+					ligne.height = y - ligne.y;
+					
+					//console.log('ligne.width : ' + ligne.height);
+					
+					//on dessine si seulement au moins 20px
+					//distance de pythagore
+					if(Math.sqrt(Math.pow(ligne.width, 2) + Math.pow(ligne.height, 2)) > 20)
+					{
+						var bodydef = new b2BodyDef;
+						var fixdef = new b2FixtureDef;
+					
+						bodydef.type = b2Body.b2_staticBody;
+						bodydef.position.x = ligne.x/SCALE;
+						bodydef.position.y = ligne.y/SCALE;
+						
+						//bodydef.bullet = true;
+						
+						fixdef.friction = 0.01;
+						
+						//fixdef.groupIndex = -2;
+						fixdef.filter.categoryBits = cat_line;
+						fixdef.filter.maskBits = cat_dog | cat_luge;
+						
+						//fixdef.shape = new b2ChainShape;
+						fixdef.shape = new b2PolygonShape;
+						fixdef.shape.SetAsEdge(new b2Vec2(0,0), new b2Vec2(ligne.width/SCALE, ligne.height/SCALE));
+						
+						var bodyline = world.CreateBody(bodydef);
+						bodyline.CreateFixture(fixdef);
+						
+						bodyline.SetUserData("line");
+						
+						
+						
+						ligne = {
+							x: ligne.x + ligne.width,
+							y: ligne.y + ligne.height
+						};
+					}
+				}
+				else
+				{
+					ligne = {
+						x: x,
+						y: y
+					};
+				}
+			}
+			
+			function dog_createjunk()
+			{
+				bodydef = new b2BodyDef;
+				fixdef = new b2FixtureDef;
+				
+				var offsetx = 0;
+				var offsety = 0;
+				
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = 5 + offsetx;
+				bodydef.position.y = 0 + offsety;
+				body = world.CreateBody(bodydef);
+				body.SetUserData("junk" + Math.floor(Math.random()*3));
+
+				fixdef.shape = new b2CircleShape(Math.random()/2 + 0.8);
+				fixdef.restitution = 0.3;
+				fixdef.density = 1;
+				fixdef.friction = 0.9;
+				fixdef.filter.categoryBits = cat_dog;
+				fixdef.filter.maskBits = ~cat_decor;
+				//fixdef.filter.groupIndex = 1;
+				//fixdef.filter.categoryBits = cat_luge;
+				body.CreateFixture(fixdef);
+				
+				//console.log(body.GetUserData());
+				
+				swrong.play();
+			}
+			
+			function dog_createdog()
+			{
+				var bodydef, fixdef, dog, luge, patin1, patin2, patin3, joint, poignee, bonnet;
+				bodydef = new b2BodyDef;
+				fixdef = new b2FixtureDef;
+				var bodytemp;
+				
+				var offsetx = -7;
+				var offsety = 1;
+				
+				//luge
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = 5 + offsetx;
+				bodydef.position.y = 0 + offsety;
+				luge = world.CreateBody(bodydef);
+				luge.SetUserData("luge");
+				
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.75, 0.1);
+				fixdef.density = 10;
+				fixdef.friction = 0;
+				//fixdef.filter.groupIndex = groupindexglobal;
+				fixdef.filter.categoryBits = cat_luge;
+				fixdef.filter.maskBits = ~cat_luge & ~cat_decor;
+				tempfixture = luge.CreateFixture(fixdef);
+				
+				//patin1
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = 5.75 + offsetx;
+				bodydef.position.y = 0.25 + offsety;
+				patin1 = world.CreateBody(bodydef);
+				patin1.SetUserData("patin");
+				
+				fixdef.shape = new b2CircleShape(0.1);
+				//fixdef.density = 1;
+				fixdef.friction = 0.01;
+				fixdef.restitution = 0;
+				//fixdef.filter.groupIndex = groupindexglobal;	
+				fixdef.filter.categoryBits = cat_luge;
+				fixdef.filter.maskBits = ~cat_luge & ~cat_decor;				
+				patin1.CreateFixture(fixdef);
+				
+				
+				
+				joint = new b2PrismaticJointDef;
+				joint.Initialize(luge, patin1, luge.GetWorldCenter(), new b2Vec2(0,1));
+				joint.lowerTranslation = 0;
+				joint.upperTranslation = 0;
+				joint.enableLimit = true;
+				joint.maxMotorForce = 10000;
+				joint.motorSpeed = 0;
+				joint.enableMotor = true;
+				world.CreateJoint(joint);
+				
+				
+				//patin2
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = 4.25 + offsetx;
+				bodydef.position.y = 0.25 + offsety;
+				patin2 = world.CreateBody(bodydef);
+				patin2.SetUserData("patin");				
+				
+				fixdef.shape = new b2CircleShape(0.1);
+				//fixdef.density = 1;
+				fixdef.friction = 0.01;
+				fixdef.restitution = 0;
+				//fixdef.filter.groupIndex = groupindexglobal;
+				fixdef.filter.categoryBits = cat_luge;
+				fixdef.filter.maskBits = ~cat_luge & ~cat_decor;				
+				patin2.CreateFixture(fixdef);
+
+				joint.Initialize(luge, patin2, luge.GetWorldCenter(), new b2Vec2(0,1));
+				joint.lowerTranslation = 0;
+				joint.upperTranslation = 0;
+				joint.enableLimit = true;
+				joint.maxMotorForce = 10000;
+				joint.motorSpeed = 0;
+				joint.enableMotor = true;
+				world.CreateJoint(joint);
+
+				//patin3
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = 5 + offsetx;
+				bodydef.position.y = 0.25 + offsety;
+				patin3 = world.CreateBody(bodydef);
+				patin3.SetUserData("patin");
+				
+				fixdef.shape = new b2CircleShape(0.1);
+				//fixdef.density = 1;
+				fixdef.friction = 0.01;
+				fixdef.restitution = 0;
+				//fixdef.filter.groupIndex = groupindexglobal;
+				fixdef.filter.categoryBits = cat_luge;
+				fixdef.filter.maskBits = ~cat_luge & ~cat_decor;				
+				patin3.CreateFixture(fixdef);
+
+				joint.Initialize(luge, patin3, luge.GetWorldCenter(), new b2Vec2(0,1));
+				joint.lowerTranslation = 0;
+				joint.upperTranslation = 0;
+				joint.enableLimit = true;
+				joint.maxMotorForce = 10000;
+				joint.motorSpeed = 0;
+				joint.enableMotor = true;
+				world.CreateJoint(joint);
+				
+				
+				//dog
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = 4.3 + offsetx;
+				bodydef.position.y = -0.4 + offsety;
+				dog = world.CreateBody(bodydef);
+				dog.SetUserData("dog" + (Math.floor(Math.random()*10%2)+1));
+				//console.log(dog.GetUserData());
+				
+				
+				fixdef.shape = new b2CircleShape(0.2);
+				fixdef.density = 5;
+				fixdef.friction = 0.9;
+				fixdef.restitution = 0.4;
+				//fixdef.filter.groupIndex = 1;
+				fixdef.shape.SetLocalPosition(new b2Vec2(-0.2, 0));
+				fixdef.filter.categoryBits = cat_dog;
+				fixdef.filter.maskBits = ~cat_decor;
+				tempfixture = dog.CreateFixture(fixdef);
+				
+				fixdef.shape = new b2PolygonShape;
+				vertices = [];
+				vertices.push(new b2Vec2(0,0.2));
+				vertices.push(new b2Vec2(-0.4,0.2));
+				vertices.push(new b2Vec2(-0.4,-0.4));
+				vertices.push(new b2Vec2(0,-0.4));
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				fixdef.density = 0.5;
+				fixdef.filter.categoryBits = cat_dog;
+				fixdef.filter.maskBits = ~cat_decor;
+				dog.CreateFixture(fixdef);
+				
+				fixdef.shape = new b2PolygonShape;
+				vertices = [];
+				vertices.push(new b2Vec2(0,-0.2));
+				vertices.push(new b2Vec2(0.6,0.25));
+				vertices.push(new b2Vec2(0,0.25));
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				fixdef.density = 0.5;
+				fixdef.filter.categoryBits = cat_dog;
+				fixdef.filter.maskBits = ~cat_decor;
+				dog.CreateFixture(fixdef);
+				
+				//attache dog
+				joint = new b2RevoluteJointDef;
+				//joint.bodyA = patin1;
+				//joint.bodyB = dog;
+				joint.collideConnected = true;
+				//joint.Initialize(patin1, dog, patin1.GetWorldCenter());
+				joint.Initialize(luge, dog, luge.GetWorldCenter());
+				
+				joint.localAnchorA.Set(0.7, 0);
+				// joint.localAnchorB.Set(4.5, 0);
+				//console.log(joint.localAnchorB.x);
+				//console.log(joint.localAnchorB.y);
+				//joint.Initialize(patin1, dog, patin1.GetWorldCenter());
+				joint.lowerAngle = -90 * Math.PI/180;
+				joint.upperAngle = 15 * Math.PI/180;
+				//console.log(joint.lowerAngle);
+				joint.enableLimit = true;
+				joint.maxMotorTorque = 10000;
+				//joint.motorSpeed = 0.5;
+				//joint.enableMotor = true;
+				//joint.localAnchorA.Set(0, 0);
+				//joint.localAnchorB.Set(0, 0);
+				world.CreateJoint(joint);
+				
+				
+				
+				dogs.push(new Dog(dog, luge, patin1, patin2, patin3));
+				luge.ApplyImpulse(new b2Vec2(Math.cos(0) * 20, Math.sin(/*Math.PI/4*/0) * 20), luge.GetWorldCenter());
+				
+				
+				//bonnet
+				/*
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = 3.8 + offsetx;
+				bodydef.position.y = -1.1 + offsety;
+				bonnet = world.CreateBody(bodydef);
+				bonnet.SetUserData("bonnet");
+				fixdef.shape = new b2CircleShape(0.1);
+				fixdef.density = 0.0001;
+				fixdef.friction = 0.1;
+				fixdef.restitution = 0.5;
+				fixdef.filter.categoryBits = cat_dog;
+				fixdef.filter.maskBits = ~cat_decor;
+				tempfixture = bonnet.CreateFixture(fixdef);
+				joint = new b2RevoluteJointDef;
+				joint.collideConnected = true;
+				joint.Initialize(dog, bonnet, new b2Vec2(dog.GetPosition().x-0.5, dog.GetPosition().y-0.5));
+				//joint.lowerAngle = -50 * Math.PI/180;
+				//joint.upperAngle = -30 * Math.PI/180;				
+				//joint.enableLimit = true;
+				world.CreateJoint(joint);
+				*/
+				//sensors
+				
+				fixdef.shape = new b2CircleShape(0.5);
+				fixdef.shape.SetLocalPosition(new b2Vec2(0, 0.3));
+				fixdef.density = 0;
+				fixdef.isSensor = true;
+				patin1.CreateFixture(fixdef);
+				patin2.CreateFixture(fixdef);
+				patin3.CreateFixture(fixdef);
+				
+				
+				groupindexglobal++;
+				
+				sgo.play();
+				
+							
+				/*
+				joint = new b2PrismaticJointDef;
+				joint.Initialize(dogs[0].mluge, bodytemp, dogs[0].mluge.GetPosition(), new b2Vec2(-1,0));
+				joint.lowerTranslation = 0;
+				joint.upperTranslation = 1;
+				joint.enableLimit = true;
+				//joint.maxMotorForce = 10000;
+				//joint.enableMotor = true;
+				world.CreateJoint(joint);
+				*/
+				/*
+				var joint = new b2RevoluteJointDef;
+				joint.Initialize(dogs[0].mluge, bodytemp, new b2Vec2(dogs[0].mluge.GetPosition().x-1, dogs[0].mluge.GetPosition().y));
+				joint.collideConnected = true;
+				//joint.length = 1;
+				//sdog2.play();
+				
+				//joint.localAnchorA.Set(0.7, 0);
+				joint.lowerAngle = -20 * Math.PI/180;
+				joint.upperAngle =  5* Math.PI/180;
+				//console.log(joint.lowerAngle);
+				joint.enableLimit = true;
+				//joint.maxMotorTorque = 0.01;
+				//joint.enableMotor = true;
+				//joint.motorSpeed = 0.01;
+				*/
+				
+
+				
+			}
+			
+			function dog_initcanvas()
+			{
+				canvas = document.getElementById('canvas');
+				context = canvas.getContext("2d");
+				/*
+				canvas.width = 1200;
+				canvas.height = 400;
+				
+				1200 -> 25
+				
+				if(window.innerWidth > 1200)
+					canvas.width = window.innerWidth;
+				
+				if(window.innerHeight > 500)
+					canvas.height = window.innerHeight;
+				*/
+				canvas.width = window.innerWidth;
+				canvas.height = window.innerHeight;
+				//canvas.height = canvas.width*1/2;
+				/*
+				if(canvas.height < canvas.width*14/32)
+					canvas.height = canvas.width * 14/32;
+				if(canvas.height > canvas.width)
+					canvas.height = canvas.width;
+				*/
+				/*
+				if(canvas.height < canvas.width*1/2)
+					canvas.height = canvas.width * 14/32;
+				*/
+				if(canvas.height > canvas.width*5/8)
+					canvas.height = canvas.width*5/8;
+				
+				
+				SCALE = canvas.width / 60;
+				SCALE_INIT = SCALE;
+				//context.translate(50,50);
+				//context.scale(1.5,1.5);
+			}
+			
+			function dog_initworld()
+			{			
+				world = new b2World(
+					new b2Vec2(0, 10),
+					true
+				);
+				
+				//ground
+				var bodydef, fixdef, body;
+				
+				fixdef = new b2FixtureDef;
+				fixdef.density = 1.0;
+				fixdef.friction = 1;
+				fixdef.restitution = 0.2;
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/2/SCALE;
+				bodydef.position.y = canvas.height/SCALE;
+				
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(canvas.width, 0.5);
+				
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				
+				body.SetUserData("sol");
+				
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = -1;
+				bodydef.position.y = 2;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(3.5, 0.2);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol_start");
+
+				
+				/*
+				//elastique
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = 2;
+				bodydef.position.y = 0.5; //hauteur du sol
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.1, 0.1);
+				fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("support_elastique");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = 2;
+				bodydef.position.y = 2; //hauteur du sol
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.1, 0.1);
+				fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("support_elastique");
+				*/
+				
+				dog_initdecor();
+			}
+			
+			function dog_initdecor()
+			{
+				var bodydef, fixdef;
+				var body, bodytemp;
+				
+				var width = canvas.width/SCALE - 5;
+				var height = canvas.height/SCALE;
+				
+				
+				//bonus
+				fixdef = new b2FixtureDef;
+				fixdef.density = 1.0;
+				fixdef.friction = 1;
+				fixdef.restitution = 0.2;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.6, 0.6);
+				fixdef.filter.categoryBits = cat_decor;
+				
+				//support1
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 1.2; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 - 2.5; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(3, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 - 5; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 - 6.5; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(3, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 - 11; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 + 0.5; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(3, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 7; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 + 11; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(3, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 - 20; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 - 11; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(3, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 6.5; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 - 7; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(2.5, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 11.5; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 - 9; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(2, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 15; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 - 3.5; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(2, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 - 15; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 + 4; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(2, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 11.5; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 + 4; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape.SetAsBox(2, 0.1);
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+
+				
+				//os1
+				/*
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 0;
+				bodydef.position.y = canvas.height/SCALE/2 + 2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("os");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 0;
+				bodydef.position.y = canvas.height/SCALE/2 + 2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("os");
+				*/
+				//support karo
+				fixdef = new b2FixtureDef;
+				fixdef.density = 1.0;
+				fixdef.friction = 1;
+				fixdef.restitution = 0.2;
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 3.5; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = canvas.height/SCALE/2 + 2; /*canvas.height/2/SCALE-5;*/
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.6, 0.2);
+				fixdef.filter.categoryBits = cat_decor;
+				//fixdef.filter.maskBits = 0xffff & ~cat_dog & ~cat_luge;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+								
+				
+				//karo
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = canvas.width/SCALE/2 + 4; 
+				bodydef.position.y = canvas.height/SCALE/2 + 0;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(1, 0.6);
+				fixdef.filter.categoryBits = cat_bckg;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("karo");
+				
+				
+				//support snowman
+				fixdef = new b2FixtureDef;
+				fixdef.density = 1.0;
+				fixdef.friction = 1;
+				fixdef.restitution = 0.2;
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = canvas.width/2/SCALE+11.5;
+				bodydef.position.y = canvas.height/SCALE-6;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.5, 0.1);
+				fixdef.filter.categoryBits = cat_decor;
+				//fixdef.filter.maskBits = 0xffff & ~cat_dog & ~cat_luge;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+				
+				//bonhomme de neige
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = canvas.width/2/SCALE+11.5;
+				bodydef.position.y = canvas.height/SCALE-7.5;
+				fixdef.shape = new b2CircleShape(0.3);
+				//fixdef.shape.SetAsBox(0.2, 2.5);
+				//fixdef.groupIndex = -2;
+				fixdef.density = 5;
+				body = world.CreateBody(bodydef);
+				fixdef.filter.categoryBits = cat_bckg;
+				body.CreateFixture(fixdef);
+				body.SetUserData("snowman_bas");
+				bodytemp = body;
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = canvas.width/2/SCALE+11.5;
+				bodydef.position.y = canvas.height/SCALE-7.8;
+				fixdef.shape = new b2CircleShape(0.25);
+				//fixdef.shape.SetAsBox(0.2, 2.5);
+				//fixdef.groupIndex = -2;
+				fixdef.density = 5;
+				body = world.CreateBody(bodydef);
+				fixdef.filter.categoryBits = cat_bckg;
+				body.CreateFixture(fixdef);
+				body.SetUserData("snowman_milieu");
+				bodytemp = body;
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = canvas.width/2/SCALE+11.5;
+				bodydef.position.y = canvas.height/SCALE-8.3;
+				fixdef.shape = new b2CircleShape(0.2);
+				//fixdef.shape.SetAsBox(0.2, 2.5);
+				//fixdef.groupIndex = -2;
+				fixdef.density = 5;
+				fixdef.filter.categoryBits = cat_bckg;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("snowman_tete");
+				bodytemp = body;
+				
+				
+				var decalagemaison = 2.5;
+				var decalagemaisony = 0.5;
+				
+				//mur1
+				fixdef = new b2FixtureDef;
+				fixdef.density = 0.5;
+				fixdef.friction = 0.9;
+				fixdef.restitution = 0.2;
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-3.8+decalagemaison;
+				bodydef.position.y = (height)-3.4+decalagemaisony; //hauteur du sol
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.2, 2.5-decalagemaisony);
+				//fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				fixdef.filter.categoryBits = cat_bckg;
+				body.CreateFixture(fixdef);
+				body.SetUserData("mur");
+				bodytemp = body;
+				
+				//support niche
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_staticBody;
+				bodydef.position.x = (width)-7;
+				bodydef.position.y = (height)-2.5;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.9, 0.1);
+				fixdef.filter.categoryBits = cat_decor;
+				//fixdef.filter.maskBits = 0xffff & ~cat_dog & ~cat_luge;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("sol");
+
+				//niche
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-7;
+				bodydef.position.y = (height)-4.5;
+				body = world.CreateBody(bodydef);
+				
+				fixdef = new b2FixtureDef;
+				fixdef.density = 1;
+				fixdef.friction = 0.6;
+				fixdef.restitution = 0.35;
+				fixdef.filter.categoryBits = cat_bckg;
+				//fixdef.groupIndex = -2;
+				
+				fixdef.shape = new b2PolygonShape;
+				//fixdef.groupIndex = -2;
+				vertices = [];
+				vertices.push(new b2Vec2(1.5,0));
+				vertices.push(new b2Vec2(1.5,0.9));
+				vertices.push(new b2Vec2(0,0.9));
+				vertices.push(new b2Vec2(0,0));
+
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				fixdef.filter.categoryBits = cat_bckg;				
+				body.CreateFixture(fixdef);
+				
+				fixdef.shape = new b2PolygonShape;
+				//fixdef.groupIndex = -2;
+				vertices = [];
+				vertices.push(new b2Vec2(0,0));
+				vertices.push(new b2Vec2(0.75, -0.5));
+				vertices.push(new b2Vec2(1.5,0));
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				body.CreateFixture(fixdef);
+				
+				//pieds
+				/*
+				fixdef.shape = new b2PolygonShape;
+				vertices = [];
+				vertices.push(new b2Vec2(1.5, 1.1));
+				vertices.push(new b2Vec2(1.2, 0.9));
+				vertices.push(new b2Vec2(1.5, 0.9));
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				body.CreateFixture(fixdef);
+				
+				fixdef.shape = new b2PolygonShape;
+				vertices = [];
+				vertices.push(new b2Vec2(0, 1.1));
+				vertices.push(new b2Vec2(0, 0.9));
+				vertices.push(new b2Vec2(0.3, 0.9));
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				body.CreateFixture(fixdef);
+				*/
+				body.SetUserData("niche");				
+				
+				//parapet
+				/*
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-9;
+				bodydef.position.y = (height)-2; //hauteur du sol
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.1, 1);
+				fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("mur");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-6.2;
+				bodydef.position.y = (height)-2; //hauteur du sol
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.1, 1);
+				fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("mur");
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-7.6;
+				bodydef.position.y = (height)-3; //hauteur du sol
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(1.5, 0.1);
+				fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("plafond");
+				*/
+
+				/*
+				joint = new b2PrismaticJointDef;
+				joint.Initialize(bodytemp, body, bodytemp.GetWorldCenter(), new b2Vec2(1,0));
+				joint.lowerTranslation = 0;
+				joint.upperTranslation = 0;
+				joint.enableLimit = true;
+				joint.maxMotorForce = 10000;
+				joint.enableMotor = true;
+				world.CreateJoint(joint);
+				*/
+				
+				//mur2
+				fixdef = new b2FixtureDef;
+				fixdef.density = 0.5;
+				fixdef.friction = 0.9;
+				fixdef.restitution = 0.2;
+				fixdef.filter.categoryBits = cat_bckg;
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-0.2+decalagemaison;
+				bodydef.position.y = (height)-3.4+decalagemaisony; //hauteur du sol
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.2, 2.5-decalagemaisony);
+				//fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("mur");
+				
+
+				
+				//greg
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-2+decalagemaison;
+				bodydef.position.y = (height)-6.5+decalagemaisony;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.6, 0.7);
+				//fixdef.groupIndex = -2;
+				fixdef.filter.categoryBits = cat_bckg;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("greg");
+				
+				
+				//plafond
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-2+decalagemaison;
+				bodydef.position.y = (height)-6.3+decalagemaisony;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(2, 0.1);
+				//fixdef.groupIndex = -2;
+				body = world.CreateBody(bodydef);
+				fixdef.filter.categoryBits = cat_bckg;
+				body.CreateFixture(fixdef);
+				body.SetUserData("plafond");
+				
+				//console.log("normale plafond : " + body.GetFixtureList().GetNormals().x
+
+				//toit
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-1+decalagemaison;
+				bodydef.position.y = (height)-8+decalagemaisony;
+				body = world.CreateBody(bodydef);
+				body.SetUserData("toit");
+				
+				fixdef.shape = new b2PolygonShape;
+				fixdef.density = 0.5;
+				fixdef.friction = 5;
+				fixdef.shape.SetAsBox(1.8, 0.15);
+				fixdef.filter.categoryBits = cat_bckg;
+				//fixdef.groupIndex = -2;
+				/*
+				var vertices = [];
+				vertices.push(new b2Vec2(2, 0));
+				vertices.push(new b2Vec2(0, 0));
+				vertices.push(new b2Vec2(0, -3));
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				*/
+				//fixdef.shape.SetAsBox(1, 0.2);
+				body.CreateFixture(fixdef);
+				body.SetPositionAndAngle(body.GetWorldCenter(), (Math.PI)/3)
+				
+				//console.log("arc tangente : " + Math.atan(1/0.5) + " ; PI/3 : " + Math.PI/3);
+				
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = (width)-3+decalagemaison;
+				bodydef.position.y = (height)-8+decalagemaisony;
+				body = world.CreateBody(bodydef);
+				body.SetUserData("toit");
+				
+				fixdef.shape = new b2PolygonShape;
+				fixdef.density = 0.5;
+				fixdef.friction = 5;
+				//fixdef.groupIndex = -2;
+				//fixdef.shape.SetAsBox(1, 0.2);
+				fixdef.shape.SetAsBox(1.8, 0.15);
+				/*
+				vertices = [];
+				vertices.push(new b2Vec2(0,0));
+				vertices.push(new b2Vec2(-2, 0));
+				vertices.push(new b2Vec2(0,-3));
+				fixdef.shape.SetAsArray(vertices, vertices.length);
+				*/
+				fixdef.filter.categoryBits = cat_bckg;
+				body.CreateFixture(fixdef);
+				body.SetPositionAndAngle(body.GetWorldCenter(), (2*Math.PI)/3);
+				
+				var vertices = body.GetFixtureList().GetShape().GetVertices();
+				//console.log("cote1 : (" + vertices[0].x + ", " + vertices[0].y + ")");
+				//console.log("cote2 : (" + vertices[1].x + ", " + vertices[1].y + ")");
+				//console.log("cote3 : (" + vertices[2].x + ", " + vertices[2].y + ")");
+				//console.log("cote4 : (" + vertices[3].x + ", " + vertices[3].y + ")");
+				//
+				
+			}
+			
+			function dog_initdraw()
+			{
+				var debugDraw = new b2DebugDraw();
+					debugDraw.SetSprite(document.getElementById("canvas").getContext("2d"));
+					debugDraw.SetDrawScale(SCALE);
+					debugDraw.SetFillAlpha(0.3);
+					debugDraw.SetLineThickness(1.0);
+					debugDraw.SetFlags(b2DebugDraw.e_shapeBit | b2DebugDraw.e_jointBit);
+					world.SetDebugDraw(debugDraw);
+				
+
+			}
+			
+			function dog_update()
+			{
+				window.requestAnimationFrame(dog_update);
+				
+				//stats.begin();
+				world.Step(
+					1 / 60,	//frame-rate
+					10,		//velocity iterations
+					10		//position iterations
+				);
+				
+				if(SCALE == SCALE_INIT && nb_os > 0)
+					dog_rocher();
+				
+				//world.DrawDebugData();
+				world.ClearForces();
+
+				canvas_draw();
+			}
+			
+			function dog_rocher()
+			{				
+				var thisloop = new Date();
+				
+				if(thisloop - lastloop > 100) {
+				fixdef = new b2FixtureDef;
+				fixdef.density = 1.0;
+				fixdef.friction = 1;
+				fixdef.restitution = 0.2;
+				fixdef.shape = new b2PolygonShape;
+				fixdef.shape.SetAsBox(0.4, 0.4);
+				//fixdef.filter.categoryBits = cat_decor;
+				
+				//support1
+				bodydef = new b2BodyDef;
+				bodydef.type = b2Body.b2_dynamicBody;
+				bodydef.position.x = Math.random() * (canvas.width/SCALE) * 17/30 + 8; /*canvas.width/2/SCALE+5;*/
+				bodydef.position.y = 0;
+				body = world.CreateBody(bodydef);
+				body.CreateFixture(fixdef);
+				body.SetUserData("os");
+				
+				lastloop = new Date();
+				nb_os-=1;
+				}
+			}
+			
+			function canvas_draw()
+			{
+				var context = document.getElementById("canvas").getContext("2d");
+				var textx = canvas.width - 50;
+				var texty = 5;
+				var offsettext = 0;
+				var decalagex = 0, decalagey = 0;
+				
+				var dog_x = 0, dog_y = 0;
+				
+				if(dogs.length > 0 && zoom == 1) {
+					dog_x = ((dogs[dogs.length-1].mluge.GetPosition().x) * SCALE)-canvas.width/3;
+					dog_y = ((dogs[dogs.length-1].mluge.GetPosition().y) * SCALE)-canvas.height/3;
+					
+					if(dog_x < 0)
+						dog_x = 0;
+					else if(dog_x > canvas.width*(SCALE/SCALE_INIT) - canvas.width)
+						dog_x = canvas.width*(SCALE/SCALE_INIT) - canvas.width;
+					if(dog_y < 0)
+						dog_y = 0;
+					else if(dog_y > canvas.height*(SCALE/SCALE_INIT) - canvas.height)
+						dog_y = canvas.height*(SCALE/SCALE_INIT) - canvas.height;
+						
+					SCALE = SCALE_INIT*1.75;
+				}
+				else
+					SCALE = SCALE_INIT;
+
+
+				context.clearRect(0, 0, canvas.width, canvas.height);
+				context.lineWidth = 3;
+				context.drawImage(loadimage("sprites/fond.jpg"), 0-dog_x, 0-dog_y, canvas.width*(SCALE/SCALE_INIT), canvas.height*(SCALE/SCALE_INIT));				
+				context.font = "12px Impact";
+				context.textAlign = "center";
+				context.fillStyle = "white";
+				context.fillText("score : " + score, canvas.width/2, 25);
+				context.lineWidth = 1;
+				
+				if(!started) {
+					context.font = "16px Impact";
+					context.textAlign = "center";
+					context.fillStyle = "white";
+					context.fillText("--- Dessine la pente et appuie sur [Espace] ---", canvas.width/2, 70);
+				}				
+				
+				context.textAlign = "right";
+				context.font = "12px Impact";
+				context.fillText("[Clic]", decalagex+ textx - 100, texty + 20);
+				context.fillText("[Espace]", decalagex+ textx - 100, texty + 40);
+				context.fillText("[Fleche HAUT", decalagex+ textx - 100, texty + 60);
+				context.fillText("[+]/[-]", decalagex+ textx - 100, texty + 90);
+				//context.fillText("[Fleche DROITE]", decalagex+ textx - 100, texty + 110);
+				context.fillText("[R]", decalagex+ textx - 100, texty + 120);
+				context.fillText("[E]", decalagex+ textx - 100, texty + 140);
+				context.fillText("[M]", decalagex+ textx - 100, texty + 160);
+				
+				context.textAlign = "left";
+				textx = textx - 92;
+				context.fillText("---  dessiner la pente", decalagex+ textx, texty + 20);
+				context.fillText("---  droper un chien/stop", decalagex+ textx, texty + 40);
+				context.fillText("---  sauter", decalagex+ textx, texty + 60);
+				context.fillText("---  zoom (si chien)", decalagex+ textx, texty + 90);
+				//context.fillText("---  turbo (si bonus)", decalagex+ textx, texty + 110);
+				context.fillText("---  recommencer", decalagex+ textx, texty + 120);
+				context.fillText("---  effacer ligne", decalagex+ textx, texty + 140);
+				context.fillText("---  musique on/off", decalagex+ textx, texty + 160);
+				
+				
+				if(texts.length > 0) {
+					for(t in texts) {
+						var now = new Date();
+						if(now.getTime() - texts[t].debut.getTime() < 500) {
+							context.font = "50px Impact";
+							context.save();
+							context.translate(texts[t].x*SCALE-dog_x, texts[t].y*SCALE-dog_y);
+							context.fillText(texts[t].msg, 0, 0);
+							texts[t].y -= 0.01;
+							context.restore();
+						}
+						else {
+							texts.splice(t, 1);
+						}
+					}
+				}
+				
+				var fixture, vertices, radius, correction;
+			
+				for(body = world.GetBodyList(); body; body = body.GetNext()) {
+					var x = body.GetPosition().x * SCALE;
+					var y = body.GetPosition().y * SCALE;
+					var angle = body.GetAngle();
+					
+					
+					x -= dog_x;
+					y -= dog_y;
+					
+					context.lineWidth = 3;
+					
+					switch(body.GetUserData()) {
+						case "line":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							context.save();
+							context.strokeStyle = "white";
+							context.beginPath();
+							context.moveTo(x, y);
+							context.lineTo(x + vertices[1].x * SCALE, y + vertices[1].y * SCALE);
+							context.stroke();
+							context.restore();
+							break;
+							
+						case "snowman_bas":
+							radius = body.GetFixtureList().GetShape().GetRadius();
+							correction = 0;//Math.PI/32;
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle+correction);
+							context.drawImage(loadimage("sprites/snowman_bas.png"), -radius*SCALE-(5/40)*SCALE, -radius*SCALE, radius*2*SCALE+(10/40)*SCALE, radius*2*SCALE);
+							context.restore();
+							break;						
+							
+						case "snowman_milieu":
+							radius = body.GetFixtureList().GetShape().GetRadius();
+							correction = 0;//Math.PI/32;
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle+correction);
+							context.drawImage(loadimage("sprites/snowman_milieu.png"), -radius*SCALE-(18/40)*SCALE, -radius*SCALE+(2/40)*SCALE, radius*2*SCALE+(30/40)*SCALE, radius*2*SCALE);
+							context.restore();
+							break;
+						
+						case "snowman_tete":
+							radius = body.GetFixtureList().GetShape().GetRadius();
+							correction = 0;//Math.PI/32;
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle+correction);
+							context.drawImage(loadimage("sprites/snowman_tete.png"), -radius*SCALE-0.075*SCALE, -radius*SCALE+(1/40)*SCALE, radius*2*SCALE+(1/40)*SCALE, radius*2*SCALE+(1/40)*SCALE);
+							context.restore();
+							break;
+							
+						case "dog1":
+							for(fixture = body.GetFixtureList(); fixture; fixture = fixture.GetNext()) {
+								if(fixture.GetShape().GetType() == 0)
+									continue;
+									
+								vertices = fixture.GetShape().GetVertices();
+
+							
+								if(vertices.length == 4) {
+									context.save();
+									context.translate(x, y);
+									context.rotate(angle);
+									context.drawImage(loadimage("sprites/dog4.png"),
+										vertices[0].x * SCALE+0.875*SCALE,
+										vertices[0].y * SCALE+0.25*SCALE ,
+										(vertices[2].x - vertices[0].x)*SCALE-1.87*SCALE,
+										(vertices[2].y - vertices[0].y)*SCALE-0.75*SCALE);
+									context.restore();
+								}
+							}
+							break;
+							
+						case "dog2":
+							for(fixture = body.GetFixtureList(); fixture; fixture = fixture.GetNext()) {
+								if(fixture.GetShape().GetType() == 0)
+									continue;
+									
+								vertices = fixture.GetShape().GetVertices();
+
+							
+								if(vertices.length == 4) {
+									context.save();
+									context.translate(x, y);
+									context.rotate(angle);
+									context.drawImage(loadimage("sprites/dog_labrador.png"),
+										vertices[0].x * SCALE+0.625*SCALE,
+										vertices[0].y * SCALE+0.2*SCALE,
+										(vertices[2].x - vertices[0].x)*SCALE-1.375*SCALE,
+										(vertices[2].y - vertices[0].y)*SCALE-0.75*SCALE);
+										
+									context.restore();
+								}
+							}
+							break;
+						
+						
+						case "luge":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							
+								context.save();
+								context.translate(x, y);
+								context.rotate(angle);
+								context.drawImage(loadimage("sprites/luge.png"),
+									vertices[0].x * SCALE,
+									vertices[0].y * SCALE,
+									(vertices[2].x - vertices[0].x)*SCALE,
+									(vertices[2].y - vertices[0].y)*SCALE+0.375*SCALE);
+								context.restore();
+							break;
+							
+						case "mur":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							context.drawImage(loadimage("sprites/rondin.png"),
+								vertices[0].x * SCALE,
+								vertices[0].y * SCALE,
+								(vertices[2].x - vertices[0].x)*SCALE,
+								(vertices[2].y - vertices[0].y)*SCALE);
+							context.restore();
+							break;
+
+						case "sol_start":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							context.drawImage(loadimage("sprites/neige.png"),
+								vertices[0].x * SCALE,
+								vertices[0].y * SCALE,
+								(vertices[2].x - vertices[0].x)*SCALE,
+								(vertices[2].y - vertices[0].y)*SCALE);
+							context.restore();
+							break;
+						
+						case "plafond":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							context.drawImage(loadimage("sprites/rondin2.png"),
+								vertices[0].x * SCALE,
+								vertices[0].y * SCALE,
+								(vertices[2].x - vertices[0].x)*SCALE,
+								(vertices[2].y - vertices[0].y)*SCALE+0.125*SCALE);
+							context.restore();
+							break;
+							
+						case "greg":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							
+							context.drawImage(loadimage("sprites/greg.png"),
+								vertices[0].x * SCALE-(5/40)*SCALE,
+								vertices[0].y * SCALE-(5/40)*SCALE,
+								(vertices[2].x - vertices[0].x)*SCALE+(10/40)*SCALE,
+								(vertices[2].y - vertices[0].y)*SCALE+(25/40)*SCALE);
+							context.restore();
+							break;
+							
+						case "karo":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							
+							context.drawImage(loadimage("sprites/karo.png"),
+								vertices[0].x * SCALE-(0/40)*SCALE,
+								vertices[0].y * SCALE-(0/40)*SCALE,
+								(vertices[2].x - vertices[0].x)*SCALE+(5/40)*SCALE,
+								(vertices[2].y - vertices[0].y)*SCALE+(5/40)*SCALE);
+							context.restore();
+							break;
+						
+						case "os":
+							vertices = body.GetFixtureList().GetShape().GetVertices();
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							
+							context.drawImage(loadimage("sprites/os.png"),
+								vertices[0].x * SCALE-(0/40)*SCALE,
+								vertices[0].y * SCALE-(0/40)*SCALE,
+								(vertices[2].x - vertices[0].x)*SCALE,
+								(vertices[2].y - vertices[0].y)*SCALE);
+							context.restore();
+							break;
+							
+						case "os|petit":
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							
+							context.drawImage(loadimage("sprites/os.png"),
+								0,
+								0,
+								10,
+								10);
+							context.restore();
+							break;
+														
+							
+						case "sol":						
+							break;
+						
+						case "niche":
+							var localangle;
+
+							for(fixture = body.GetFixtureList(); fixture; fixture = fixture.GetNext()) {
+								vertices = fixture.GetShape().GetVertices();
+
+								context.save();
+								context.translate(x, y);
+								context.rotate(angle);
+								
+								if(vertices.length == 4) { // boite
+									context.drawImage(loadimage("sprites/niche.png"),
+									vertices[0].x * SCALE,
+									vertices[0].y * SCALE - 0.5*SCALE,
+									(vertices[2].x - vertices[0].x)*SCALE-(5/40)*SCALE,
+									(vertices[2].y - vertices[0].y)*SCALE+(30/40)*SCALE);
+								}
+							
+								context.restore();
+							}
+							break;
+							
+						case "toit":
+							var vertices = body.GetFixtureList().GetShape().GetVertices();
+
+							context.save();
+							context.translate(x, y);
+							context.rotate(angle);
+							context.drawImage(loadimage("sprites/rondin2.png"),
+								vertices[0].x * SCALE,
+								vertices[0].y * SCALE,
+								(vertices[2].x - vertices[0].x)*SCALE+0.25*SCALE,
+								(vertices[2].y - vertices[0].y)*SCALE);
+							context.restore();
+							break;
+
+						default:
+							var data = body.GetUserData();
+								
+							if(!data)
+								break;
+									
+							if(data.indexOf("junk") != -1) {
+									var radius = body.GetFixtureList().GetShape().GetRadius();
+									
+									context.save();
+									context.translate(x, y);
+									context.rotate(angle);
+									
+									if(data == "junk0")
+										context.drawImage(loadimage("sprites/max.png"), -radius*SCALE, -radius*SCALE, radius*2*SCALE, radius*2*SCALE);
+									if(data == "junk1")
+										context.drawImage(loadimage("sprites/max.png"), -radius*SCALE, -radius*SCALE, radius*2*SCALE, radius*2*SCALE);
+									if(data == "junk2")
+										context.drawImage(loadimage("sprites/max.png"), -radius*SCALE, -radius*SCALE, radius*2*SCALE, radius*2*SCALE);	
+									
+									context.restore();
+								}
+								
+							else if(data.indexOf("dead") != -1) {
+								dog_niche();
+							}
+								
+							else if(data.indexOf("os|mange") != -1) {						
+								var indexchien = data.split("|")[2];
+								world.DestroyBody(body);
+								
+								
+								var bodydef = new b2BodyDef;
+								var fixdef = new b2FixtureDef;
+								var bodytemp;
+							
+								bodydef.type = b2Body.b2_dynamicBody;
+								bodydef.position.x = dogs[indexchien].mdog.GetPosition().x - 0.9 - dogs[indexchien].os*0.1;
+								bodydef.position.y = dogs[indexchien].mdog.GetPosition().y;
+								bodytemp = world.CreateBody(bodydef);
+								bodytemp.SetUserData("os");
+								
+								fixdef.shape = new b2PolygonShape();
+								fixdef.shape.SetAsBox(0.2,0.2);
+								fixdef.restitution = 0;
+								fixdef.density = 0.000001;
+								fixdef.friction = 0;
+								fixdef.filter.maskBits = 0x0000;
+								fixdef.filter.categoryBits = 0x1000;
+								bodytemp.CreateFixture(fixdef);
+								
+								var joint = new b2DistanceJointDef;
+								joint.Initialize(dogs[indexchien].mluge, bodytemp, dogs[indexchien].mluge.GetPosition(), bodytemp.GetPosition());
+								joint.collideConnected = false;
+								
+								world.CreateJoint(joint);
+								
+								
+							}
+							
+							break;
+					}
+					
+			}
+			
+			
+			
+			};
+		</script>
+	</body>
+</html>

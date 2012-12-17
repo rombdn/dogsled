@@ -1,0 +1,7 @@
+* { margin:0; padding:0; } /* to remove the top and left whitespace */
+html, body { font-family: impact; font-size: 15px; width:100%; height:100%; } /* just to be sure these are full screen*/
+canvas { display:block; } /* To remove the scrollbars */
+audio { display:none; }
+
+#loading { font-size: 15px; font-family: impact, helvetica; text-align: center; margin: 25px 25px 25px 25px; }
+#alert { display: none; font-size: 15px; font-family: impact, helvetica; text-align: center; margin: 25px 25px 25px 25px; }

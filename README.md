@@ -14,4 +14,6 @@ there are more up to date ports i didn't try like these ones : http://code.googl
 
 i do not own (all) the graphics
 
+you can play it here : http://www.wajrak.com
+
 have fun!

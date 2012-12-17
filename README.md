@@ -1,7 +1,7 @@
 doggysled : quick and dirty game in html5 and box2d
 =========
 
-little game I made while playing around with html5 canvas and box2d
+little game I made while playing around with html5 canvas and box2d (http://box2d.org/) using these tutorials http://blog.sethladd.com/search/label/box2d
 
 the code dirty, not robust and not maintenable (i added functionnalities gradually as i learned...) but i maybe some parts could serve as real situation exemples of how to use box2d in javascript and how to add graphics in front of box2d.
 

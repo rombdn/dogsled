@@ -1,7 +1,7 @@
 Dogsled
 =========
 
-Little weekend project with HTML5 canvas and Box2D.
+Weekend project with Canvas and Box2D.
 
 You can play it here : http://www.wajrak.com
 
